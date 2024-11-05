@@ -2,10 +2,13 @@ use std::env;
 use std::process::{Command, Stdio};
 use std::path::PathBuf;
 use rprompt::prompt_reply;
+use winapi::um::wincon::GetConsoleWindow;
+use winapi::um::winuser::ShowWindow;
+use winapi::um::winuser::SW_HIDE;
 use reqwest::Error;
 use serde_json::Value;
 
-const VERSION: &str = "0.0.1";
+const VERSION: &str = "0.0.2";
 
 fn check_version() -> Result<(), Error> {
     // Указание нужного репозитория в формате "owner/repo"
@@ -20,9 +23,10 @@ fn check_version() -> Result<(), Error> {
 
     if response.status().is_success() {
         let release_info: Value = response.json()?;
-        let latest_version = release_info["tag_name"].as_str().unwrap_or("N/A");
+        let latest_version = release_info["name"].as_str().unwrap_or("N/A");
+        let current_version = format!("v{}", VERSION);
 
-        if latest_version > VERSION {
+        if latest_version != current_version {
             println!("Доступна новая версия {}! Рекомендовано обновиться", latest_version);
         } else {
 
@@ -77,7 +81,18 @@ fn main() {
 
     match command.spawn() {
         Ok(mut child) => {
-            println!("Процесс успешно запущен!");
+            println!("Процесс успешно запущен! Для скрытия окна нажмите клавишу Enter.");
+            prompt_reply("").expect("");
+
+            // Получаем дескриптор окна консоли и скрываем его
+            unsafe {
+                let console_window = GetConsoleWindow();
+                if !console_window.is_null() {
+                    ShowWindow(console_window, SW_HIDE);
+                } else {
+                    println!("Не удалось получить дескриптор окна.");
+                }
+            }
             match child.wait() {
                 Ok(status) => println!("Процесс завершился со статусом: {}", status),
                 Err(e) => eprintln!("Ошибка ожидания завершения процесса: {}", e),
